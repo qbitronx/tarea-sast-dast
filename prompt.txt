@@ -1,0 +1,4 @@
+Create a small app : web (react) and api (nodejs) to show a demo about athentication and authorization
+For authentication must support login + MFA
+For authorization must implement 2 approaches: RBAC (crud. roles. users. roles-users assigments) and ABAC (domian product with tasks select insert delete update)
+Creat 1 admin user, and 2 standard users to test RBAC amd ABAC independently

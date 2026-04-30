@@ -1,0 +1,98 @@
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       security_demo
+      POSTGRES_USER:     demo
+      POSTGRES_PASSWORD: demo_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d security_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Node.js API ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT:           4000
+      DATABASE_URL:   postgresql://demo:demo_pass@db:5432/security_demo
+      JWT_SECRET:     change_me_in_production_jwt_secret
+      JWT_MFA_SECRET: change_me_in_production_mfa_secret
+      CORS_ORIGIN:    http://localhost
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/api/auth/me', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ── React SPA (nginx) ─────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+  # ── OWASP ZAP (DAST) — perfil "dast", no arranca con `docker compose up` ──
+  # Uso: docker compose --profile dast run --rm zap
+  #   o: make dast-zap
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    profiles: ["dast"]
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./dast/reports:/zap/wrk:rw
+    command: >-
+      zap-baseline.py
+      -t http://api:4000
+      -r zap-report.html
+      -J zap-report.json
+      -l WARN
+      -I
+
+  # ── SonarQube Community (SAST dashboard) ─────────────────────────────────
+  sonarqube:
+    image: sonarqube:community
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_logs:/opt/sonarqube/logs
+      - sonar_extensions:/opt/sonarqube/extensions
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+
+volumes:
+  pg_data:
+  sonar_data:
+  sonar_logs:
+  sonar_extensions:
