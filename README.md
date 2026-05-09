@@ -1,4 +1,4 @@
-# Auth Demo — Autenticación, RBAC y ABAC
+# SAST / DAST Demo aplicado al proyecto Autenticación, RBAC y ABAC
 
 Aplicación de demostración full-stack que ilustra patrones de seguridad estándar de la industria: autenticación multifactor, control de acceso basado en roles (RBAC) y control de acceso basado en atributos (ABAC). La API sigue la **Arquitectura Hexagonal (Puertos y Adaptadores)**, manteniendo toda la lógica de seguridad en un núcleo de dominio independiente del framework.
 
